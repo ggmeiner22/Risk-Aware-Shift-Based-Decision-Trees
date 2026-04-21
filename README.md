@@ -29,8 +29,8 @@ The goal is to produce decision trees that are not only accurate, but also **mor
 
 ---
 
-## Project Structure
-
+## Project Structure  
+```
 ├── Makefile
 ├── README.md
 ├── data
@@ -46,7 +46,7 @@ The goal is to produce decision trees that are not only accurate, but also **mor
     ├── experiment.cpp
     ├── main.cpp
     └── tree.cpp
-
+```
 ---
 
 ## Execution
