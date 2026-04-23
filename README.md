@@ -31,55 +31,90 @@ The goal is to produce decision trees that are not only accurate, but also **mor
 
 ## Project Structure  
 ```
+.
 ├── Makefile
 ├── README.md
 ├── data
-│   ├── BreastCancerWisconsin.csv
-│   ├── diabetes.csv
-│   └── heartDisease.csv
+│   ├── BreastCancerWisconsin.csv
+│   ├── diabetes.csv
+│   └── heartDisease.csv
 ├── include
-│   └── core.h
+│   └── core.h
 ├── results
-│   └── experiment_results.csv
-└── src
-    ├── data.cpp
-    ├── experiment.cpp
-    ├── main.cpp
-    └── tree.cpp
+│   ├── test1_gain_ratio.csv
+│   ├── test2_class_confidence.csv
+│   ├── test3_risk_aware_shift_beta_0_3.csv
+│   └── test4_risk_aware_shift_beta_sweep.csv
+├── src
+│   ├── data.cpp
+│   ├── experiment.cpp
+│   ├── main.cpp
+│   └── tree.cpp
+├── test_confidence.sh
+├── test_gain_ratio.sh
+├── test_risk_shift.sh
+└── test_risk_shift_beta_sweep.sh
 ```
 ---
 
 ## Execution
 
-Compile using:
-
+Build:
 ```bash
 make
 ```
-This produces the executable to run:
+
+Permissions:
 ```bash
-./risk_aware_shift_trees
+chmod +x test_gain_ratio.sh test_confidence.sh test_risk_shift.sh test_risk_shift_beta_sweep.sh risk_aware_shift_trees
 ```
 
-Optional Arguments
-`--data-root <path>`    # Path to dataset folder (default: current directory)
-`--results <path>`      # Output CSV file (default: results/experiment_results.csv)
-`--seed <int>`          # Random seed (default: 1337)
-`--betas <list>`        # Comma-separated beta values for risk-aware method
+This produces the `risk_aware_shift_trees` executable in the repository root. Run it with:
 
-Example:
 ```bash
-./risk_aware_shift_trees --data-root data --betas 0.0,0.1,0.2,0.5,1.0
+./risk_aware_shift_trees [options]
 ```
+
+Common options:
+- `--data-root <path>`    : Path to dataset folder (default: `data`)
+- `--results <path>`      : Output CSV file (default: `results/experiment_results.csv`)
+- `--seed <int>`          : Random seed (default: `1337`)
+- `--betas <list>`        : Comma-separated beta values for the risk-aware method (e.g. `0.0,0.1,0.2`)
+- `--help`                : Show command-line usage
+
+Examples:
+
+Run experiments on all datasets with several beta values and save results:
+
+```bash
+./risk_aware_shift_trees --data-root data --betas 0.0,0.1,0.2,0.5,1.0 --results results/test_run.csv
+```
+
+Run a single experiment with a fixed seed:
+
+```bash
+./risk_aware_shift_trees --data-root data --results results/diabetes.csv --seed 42
+```
+
+Provided convenience scripts:
+
+```bash
+./test_gain_ratio.sh
+./test_confidence.sh
+./test_risk_shift.sh
+./test_risk_shift_beta_sweep.sh
+```
+
+Notes:
+- Ensure the executable has execute permissions (`chmod +x risk_aware_shift_trees`).
+- The program prints CSV-formatted results to stdout and writes to the path passed via `--results` (default: `results/experiment_results.csv`).
 
 ## Output
 The program prints results to the console:
-
 ```bash
 Dataset,Method,Beta,Accuracy,AvgShift,AvgRisk,MaxDepth,TotalNodes
 ...
 ```
-
 It also saves results to:
 > results/experiment_results.csv
 

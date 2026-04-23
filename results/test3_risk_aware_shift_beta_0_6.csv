@@ -1,0 +1,4 @@
+dataset,method,beta,accuracy,avg_shift,avg_risk,max_depth,total_nodes
+"Pima Indians Diabetes",risk_aware_shift,0.600000,0.700260,0.332907,0.315966,10.000000,141.200000
+"Breast Cancer Wisconsin",risk_aware_shift,0.600000,0.923026,0.427920,0.163456,5.000000,22.200000
+"Heart Disease",risk_aware_shift,0.600000,0.725859,0.374550,0.319304,9.600000,178.000000
