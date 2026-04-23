@@ -18,6 +18,13 @@ enum class Criterion {
     RiskAwareShift,
 };
 
+enum class MethodSelection {
+    All,
+    GainRatioOnly,
+    ClassConfidenceOnly,
+    RiskAwareShiftOnly,
+};
+
 struct FeatureSpec {
     std::string name;
     FeatureType type;
@@ -37,6 +44,7 @@ struct ExperimentConfig {
     std::string results_path;
     int seed;
     std::vector<double> betas;
+    MethodSelection method;
 
     ExperimentConfig();
 };
@@ -105,4 +113,4 @@ std::unique_ptr<TreeNode> build_tree(
 int predict(const TreeNode& node, const Table& table, int row_index);
 TreeMetrics evaluate_tree(const TreeNode& tree, const Table& table, const std::vector<int>& test_indices);
 
-}  // namespace risk_aware_shift
+}  

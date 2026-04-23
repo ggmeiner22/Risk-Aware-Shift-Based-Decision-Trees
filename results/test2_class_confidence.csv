@@ -1,0 +1,4 @@
+dataset,method,beta,accuracy,avg_shift,avg_risk,max_depth,total_nodes
+"Pima Indians Diabetes",class_confidence,,0.686979,0.193886,0.273241,16.300000,150.400000
+"Breast Cancer Wisconsin",class_confidence,,0.923719,0.285326,0.134636,7.100000,24.400000
+"Heart Disease",class_confidence,,0.731501,0.283332,0.286943,13.100000,181.300000

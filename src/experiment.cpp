@@ -68,6 +68,25 @@ std::vector<double> parse_betas(const std::string& raw) {
     return betas;
 }
 
+MethodSelection parse_method(const std::string& raw) {
+    const std::string method = trim(raw);
+    if (method == "all") {
+        return MethodSelection::All;
+    }
+    if (method == "gain_ratio") {
+        return MethodSelection::GainRatioOnly;
+    }
+    if (method == "class_confidence") {
+        return MethodSelection::ClassConfidenceOnly;
+    }
+    if (method == "risk_aware_shift") {
+        return MethodSelection::RiskAwareShiftOnly;
+    }
+    throw std::runtime_error(
+        "Unknown method: " + method +
+        " (expected: all, gain_ratio, class_confidence, risk_aware_shift)");
+}
+
 TreeMetrics mean_metrics(const std::vector<TreeMetrics>& folds) {
     TreeMetrics result;
     if (folds.empty()) {
@@ -97,7 +116,8 @@ ExperimentConfig::ExperimentConfig()
     : data_root(join_path(current_working_directory(), "data")),
       results_path(join_path(join_path(current_working_directory(), "results"), "experiment_results.csv")),
       seed(1337),
-      betas(std::vector<double>(1, 0.0)) {
+      betas(std::vector<double>(1, 0.0)),
+      method(MethodSelection::All) {
     betas.push_back(0.05);
     betas.push_back(0.1);
     betas.push_back(0.15);
@@ -210,6 +230,8 @@ ExperimentConfig parse_args(int argc, char** argv) {
             config.seed = std::stoi(require_value(arg));
         } else if (arg == "--betas") {
             config.betas = parse_betas(require_value(arg));
+        } else if (arg == "--method") {
+            config.method = parse_method(require_value(arg));
         } else {
             throw std::runtime_error("Unknown argument: " + arg);
         }
@@ -271,10 +293,18 @@ std::vector<AggregateMetrics> run_experiments(const std::vector<Table>& datasets
             results.push_back(summary);
         };
 
-        run_method("gain_ratio", Criterion::GainRatio, std::numeric_limits<double>::quiet_NaN());
-        run_method("class_confidence", Criterion::ClassConfidence, std::numeric_limits<double>::quiet_NaN());
-        for (double beta : config.betas) {
-            run_method("risk_aware_shift", Criterion::RiskAwareShift, beta);
+        if (config.method == MethodSelection::All || config.method == MethodSelection::GainRatioOnly) {
+            run_method("gain_ratio", Criterion::GainRatio, std::numeric_limits<double>::quiet_NaN());
+        }
+
+        if (config.method == MethodSelection::All || config.method == MethodSelection::ClassConfidenceOnly) {
+            run_method("class_confidence", Criterion::ClassConfidence, std::numeric_limits<double>::quiet_NaN());
+        }
+
+        if (config.method == MethodSelection::All || config.method == MethodSelection::RiskAwareShiftOnly) {
+            for (double beta : config.betas) {
+                run_method("risk_aware_shift", Criterion::RiskAwareShift, beta);
+            }
         }
     }
 
@@ -328,4 +358,4 @@ void print_results(const std::vector<AggregateMetrics>& results) {
     }
 }
 
-}  // namespace risk_aware_shift
+}

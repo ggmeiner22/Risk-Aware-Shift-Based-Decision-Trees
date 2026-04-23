@@ -1,0 +1,4 @@
+dataset,method,beta,accuracy,avg_shift,avg_risk,max_depth,total_nodes
+"Pima Indians Diabetes",gain_ratio,,0.684115,0.084233,0.325602,53.600000,182.000000
+"Breast Cancer Wisconsin",gain_ratio,,0.916348,0.200526,0.159195,9.200000,30.000000
+"Heart Disease",gain_ratio,,0.724570,0.170308,0.321439,26.300000,194.900000
