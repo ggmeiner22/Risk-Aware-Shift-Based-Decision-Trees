@@ -12,8 +12,15 @@
 namespace risk_aware_shift {
 namespace {
 
+/*
+ * Small constant to avoid floating-point instability.
+ */
 constexpr double kEpsilon = 1e-12;
 
+/*
+ * Represents a candidate split during tree construction.
+ * Stores both the split parameters and evaluation metrics.
+ */
 struct CandidateSplit {
     bool valid = false;
     int feature_index = -1;
@@ -24,6 +31,9 @@ struct CandidateSplit {
     double risk = 0.0;
 };
 
+/*
+ * Count class occurrences for a subset of data.
+ */
 std::vector<int> class_counts(const Table& table, const std::vector<int>& indices) {
     std::vector<int> counts(table.class_names.size(), 0);
     for (int index : indices) {
@@ -32,6 +42,10 @@ std::vector<int> class_counts(const Table& table, const std::vector<int>& indice
     return counts;
 }
 
+/*
+ * Check if all samples belong to the same class.
+ * Used as a stopping condition for tree growth.
+ */
 bool is_pure(const Table& table, const std::vector<int>& indices) {
     if (indices.empty()) {
         return true;
@@ -42,6 +56,10 @@ bool is_pure(const Table& table, const std::vector<int>& indices) {
     });
 }
 
+/*
+ * Return the majority class label for a subset.
+ * Used for leaf predictions.
+ */
 int majority_class(const Table& table, const std::vector<int>& indices) {
     const auto counts = class_counts(table, indices);
     return static_cast<int>(std::distance(
@@ -49,6 +67,10 @@ int majority_class(const Table& table, const std::vector<int>& indices) {
         std::max_element(counts.begin(), counts.end())));
 }
 
+/*
+ * Compute entropy from class counts.
+ * Used for gain ratio calculations.
+ */
 double entropy_from_counts(const std::vector<int>& counts) {
     const double total = static_cast<double>(std::accumulate(counts.begin(), counts.end(), 0));
     if (total <= 0.0) {
@@ -66,6 +88,9 @@ double entropy_from_counts(const std::vector<int>& counts) {
     return result;
 }
 
+/*
+ * Normalize class counts into probability distribution.
+ */
 std::vector<double> normalized_distribution(const std::vector<int>& counts) {
     const double total = static_cast<double>(std::accumulate(counts.begin(), counts.end(), 0));
     std::vector<double> result(counts.size(), 0.0);
@@ -73,12 +98,16 @@ std::vector<double> normalized_distribution(const std::vector<int>& counts) {
         return result;
     }
 
-    for (std::size_t index = 0; index < counts.size(); ++index) {
+    for (std::size_t index = 0; index < counts.size(); index++) {
         result[index] = static_cast<double>(counts[index]) / total;
     }
     return result;
 }
 
+/*
+ * Compute distributional shift between parent and child nodes.
+ * Measures how much class distributions change after a split.
+ */
 double compute_shift(const std::vector<int>& parent_counts, const std::vector<std::vector<int>>& child_counts) {
     const auto parent_distribution = normalized_distribution(parent_counts);
     const double parent_total = static_cast<double>(std::accumulate(parent_counts.begin(), parent_counts.end(), 0));
@@ -94,7 +123,7 @@ double compute_shift(const std::vector<int>& parent_counts, const std::vector<st
         }
         const auto child_distribution = normalized_distribution(child);
         double distance = 0.0;
-        for (std::size_t label = 0; label < child_distribution.size(); ++label) {
+        for (std::size_t label = 0; label < child_distribution.size(); label++) {
             distance += std::fabs(child_distribution[label] - parent_distribution[label]);
         }
         shift += (child_total / parent_total) * distance;
@@ -103,6 +132,10 @@ double compute_shift(const std::vector<int>& parent_counts, const std::vector<st
     return shift;
 }
 
+/*
+ * Compute worst-case risk across branches.
+ * Risk is defined as 1 - dominant class proportion.
+ */
 double compute_risk(const std::vector<std::vector<int>>& child_counts) {
     double risk = 0.0;
     for (const auto& child : child_counts) {
@@ -117,6 +150,9 @@ double compute_risk(const std::vector<std::vector<int>>& child_counts) {
     return risk;
 }
 
+/*
+ * Standard Gain Ratio criterion (C4.5).
+ */
 double compute_gain_ratio_score(const std::vector<int>& parent_counts, const std::vector<std::vector<int>>& child_counts) {
     const double parent_total = static_cast<double>(std::accumulate(parent_counts.begin(), parent_counts.end(), 0));
     if (parent_total <= 0.0) {
@@ -145,6 +181,10 @@ double compute_gain_ratio_score(const std::vector<int>& parent_counts, const std
     return info_gain / split_info;
 }
 
+/*
+ * Class confidence criterion.
+ * Measures how dominant the majority class is after splitting.
+ */
 double compute_class_confidence_score(const std::vector<std::vector<int>>& child_counts) {
     double weighted_dominance = 0.0;
     double total = 0.0;
@@ -165,10 +205,18 @@ double compute_class_confidence_score(const std::vector<std::vector<int>>& child
     return weighted_dominance / total;
 }
 
+/*
+ * Proposed Risk-Aware Shift criterion.
+ * Combines shift (informativeness) and risk (uncertainty penalty).
+ */
 double compute_risk_aware_score(double shift, double risk, double beta) {
     return shift * std::max(0.0, 1.0 - beta * risk);
 }
 
+/*
+ * Unified scoring function for all criteria.
+ * Also outputs shift and risk for analysis.
+ */
 double compute_score(
     Criterion criterion,
     const std::vector<int>& parent_counts,
@@ -191,6 +239,13 @@ double compute_score(
     return 0.0;
 }
 
+/*
+ * Compare two candidate splits.
+ * Prioritizes:
+ * 1. Higher score
+ * 2. Higher shift (tie-breaker)
+ * 3. Lower risk (final tie-breaker)
+ */
 bool better_candidate(const CandidateSplit& lhs, const CandidateSplit& rhs) {
     if (!lhs.valid) {
         return false;
@@ -212,6 +267,10 @@ bool better_candidate(const CandidateSplit& lhs, const CandidateSplit& rhs) {
     return false;
 }
 
+/*
+ * Evaluate all possible thresholds for a numeric feature.
+ * Finds the best binary split.
+ */
 CandidateSplit evaluate_numeric_feature(
     const Table& table,
     const std::vector<int>& indices,
@@ -242,7 +301,7 @@ CandidateSplit evaluate_numeric_feature(
     std::vector<int> right_counts = parent_counts;
     CandidateSplit best;
 
-    for (std::size_t i = 0; i + 1 < entries.size(); ++i) {
+    for (std::size_t i = 0; i + 1 < entries.size(); i++) {
         left_counts[entries[i].label]++;
         right_counts[entries[i].label]--;
 
@@ -268,10 +327,13 @@ CandidateSplit evaluate_numeric_feature(
             best = current;
         }
     }
-
     return best;
 }
 
+/*
+ * Evaluate categorical feature split.
+ * Each unique value becomes a branch.
+ */
 CandidateSplit evaluate_categorical_feature(
     const Table& table,
     const std::vector<int>& indices,
@@ -313,6 +375,9 @@ CandidateSplit evaluate_categorical_feature(
     return candidate;
 }
 
+/*
+ * Find the best feature and split for current node.
+ */
 CandidateSplit find_best_split(
     const Table& table,
     const std::vector<int>& indices,
@@ -321,7 +386,7 @@ CandidateSplit find_best_split(
     double beta) {
     CandidateSplit best;
 
-    for (std::size_t feature = 0; feature < table.features.size(); ++feature) {
+    for (std::size_t feature = 0; feature < table.features.size(); feature++) {
         CandidateSplit candidate;
         if (table.features[feature].type == FeatureType::Numeric) {
             candidate = evaluate_numeric_feature(table, indices, static_cast<int>(feature), criterion, beta);
@@ -333,10 +398,12 @@ CandidateSplit find_best_split(
             best = candidate;
         }
     }
-
     return best;
 }
 
+/*
+ * Partition dataset based on numeric threshold.
+ */
 std::pair<std::vector<int>, std::vector<int>> partition_numeric(
     const Table& table,
     const std::vector<int>& indices,
@@ -354,6 +421,9 @@ std::pair<std::vector<int>, std::vector<int>> partition_numeric(
     return {left, right};
 }
 
+/*
+ * Partition dataset based on categorical values.
+ */
 std::map<std::string, std::vector<int>> partition_categorical(
     const Table& table,
     const std::vector<int>& indices,
@@ -365,6 +435,10 @@ std::map<std::string, std::vector<int>> partition_categorical(
     return groups;
 }
 
+/*
+ * Statistics collected during tree traversal.
+ * Used for evaluating structural properties of the tree.
+ */
 struct TraversalStats {
     double weighted_shift_sum = 0.0;
     double weighted_risk_sum = 0.0;
@@ -373,6 +447,10 @@ struct TraversalStats {
     int total_nodes = 0;
 };
 
+/*
+ * Traverse the tree and collect statistics.
+ * Aggregates shift/risk weighted by sample counts.
+ */
 void collect_stats(const TreeNode& node, int depth, TraversalStats& stats) {
     stats.total_nodes++;
     stats.max_depth = std::max(stats.max_depth, depth);
@@ -395,8 +473,17 @@ void collect_stats(const TreeNode& node, int depth, TraversalStats& stats) {
     }
 }
 
-}  // namespace
+}  // namespace ends
 
+/*
+ * Recursively build the decision tree.
+ *
+ * Key steps:
+ * 1. Check stopping conditions (pure or empty)
+ * 2. Find best split using selected criterion
+ * 3. Partition data
+ * 4. Recursively build children
+ */
 std::unique_ptr<TreeNode> build_tree(
     const Table& table,
     const std::vector<int>& indices,
@@ -445,10 +532,12 @@ std::unique_ptr<TreeNode> build_tree(
                 build_tree(table, group.second, next_available, criterion, beta, depth + 1);
         }
     }
-
     return node;
 }
 
+/*
+ * Predict class label for a single sample.
+ */
 int predict(const TreeNode& node, const Table& table, int row_index) {
     if (node.is_leaf) {
         return node.predicted_class;
@@ -469,6 +558,16 @@ int predict(const TreeNode& node, const Table& table, int row_index) {
     return predict(*it->second, table, row_index);
 }
 
+/*
+ * Evaluate tree performance on test set.
+ *
+ * Computes:
+ * - Accuracy
+ * - Average shift
+ * - Average risk
+ * - Tree depth
+ * - Total number of nodes
+ */
 TreeMetrics evaluate_tree(const TreeNode& tree, const Table& table, const std::vector<int>& test_indices) {
     TreeMetrics metrics;
 
@@ -489,4 +588,4 @@ TreeMetrics evaluate_tree(const TreeNode& tree, const Table& table, const std::v
     return metrics;
 }
 
-}  // namespace risk_aware_shift
+}  // namespace risk_aware_shift ends

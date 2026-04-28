@@ -12,6 +12,10 @@
 namespace risk_aware_shift {
 namespace {
 
+    /*
+ * Trim whitespace from both ends of a string.
+ * Used for cleaning CSV values before parsing.
+ */
 std::string trim(const std::string& value) {
     const auto first = value.find_first_not_of(" \t\r\n");
     if (first == std::string::npos) {
@@ -21,17 +25,22 @@ std::string trim(const std::string& value) {
     return value.substr(first, last - first + 1);
 }
 
+/*
+ * Split a CSV line into fields.
+ * Handles quoted fields and escaped quotes ("").
+ * This is more robust than a simple split on commas.
+ */
 std::vector<std::string> split_csv_line(const std::string& line) {
     std::vector<std::string> result;
     std::string current;
     bool in_quotes = false;
 
-    for (std::size_t i = 0; i < line.size(); ++i) {
+    for (std::size_t i = 0; i < line.size(); i++) {
         const char ch = line[i];
         if (ch == '"') {
             if (in_quotes && i + 1 < line.size() && line[i + 1] == '"') {
                 current.push_back('"');
-                ++i;
+                i++;
             } else {
                 in_quotes = !in_quotes;
             }
@@ -47,6 +56,10 @@ std::vector<std::string> split_csv_line(const std::string& line) {
     return result;
 }
 
+/*
+ * Reads an entire CSV file into rows of string values.
+ * Throws an error if the file cannot be opened.
+ */
 std::vector<std::vector<std::string> > read_csv_rows(const std::string& path) {
     std::ifstream input(path);
     if (!input) {
@@ -64,6 +77,10 @@ std::vector<std::vector<std::string> > read_csv_rows(const std::string& path) {
     return rows;
 }
 
+/*
+ * Convert a string to double, returning NaN if missing.
+ * Missing values are represented by empty string or "?".
+ */
 double parse_double_or_nan(const std::string& raw) {
     const std::string value = trim(raw);
     if (value.empty() || value == "?") {
@@ -72,6 +89,9 @@ double parse_double_or_nan(const std::string& raw) {
     return std::stod(value);
 }
 
+/*
+ * Construct an empty Table object with metadata initialized.
+ */
 Table make_empty_table(
     const std::string& name,
     const std::vector<FeatureSpec>& features,
@@ -83,6 +103,10 @@ Table make_empty_table(
     return table;
 }
 
+/*
+ * Compute the median of a vector of numeric values.
+ * Used for imputing missing values.
+ */
 double median(std::vector<double> values) {
     if (values.empty()) {
         return 0.0;
@@ -96,14 +120,19 @@ double median(std::vector<double> values) {
     return values[mid];
 }
 
-}  // namespace
+}  // namespace ends
 
+/*
+ * Load Pima Indians Diabetes dataset.
+ * Assumes fixed column ordering and numeric features.
+ */
 Table load_pima(const std::string& path) {
     const auto rows = read_csv_rows(path);
     if (rows.size() < 2) {
         throw std::runtime_error("Pima dataset is empty: " + path);
     }
 
+    // Define feature schema
     const std::vector<FeatureSpec> features{
         {"Pregnancies", FeatureType::Numeric},
         {"Glucose", FeatureType::Numeric},
@@ -117,33 +146,41 @@ Table load_pima(const std::string& path) {
 
     Table table = make_empty_table("Pima Indians Diabetes", features, {"negative", "positive"});
 
-    for (std::size_t row = 1; row < rows.size(); ++row) {
+    // Parse rows into numeric feature vectors
+    for (std::size_t row = 1; row < rows.size(); row++) {
         if (rows[row].size() < 9) {
             continue;
         }
 
         std::vector<double> numeric(features.size(), std::numeric_limits<double>::quiet_NaN());
         std::vector<std::string> categorical(features.size());
-        for (std::size_t feature = 0; feature < features.size(); ++feature) {
+        for (std::size_t feature = 0; feature < features.size(); feature+) {
             numeric[feature] = parse_double_or_nan(rows[row][feature]);
         }
 
+        //Seperate into numeric and categorical features
         table.numeric_values.push_back(std::move(numeric));
         table.categorical_values.push_back(std::move(categorical));
+
         table.labels.push_back(std::stoi(trim(rows[row][8])));
     }
 
     return table;
 }
 
+/*
+ * Load Breast Cancer dataset.
+ * Dynamically extracts feature names from header row.
+ */
 Table load_breast(const std::string& path) {
     const auto rows = read_csv_rows(path);
     if (rows.size() < 2) {
         throw std::runtime_error("Breast-cancer dataset is empty: " + path);
     }
 
+    // Create feature schema
     std::vector<FeatureSpec> features;
-    for (std::size_t column = 2; column < rows[0].size(); ++column) {
+    for (std::size_t column = 2; column < rows[0].size(); column++) {
         const std::string name = trim(rows[0][column]);
         if (!name.empty()) {
             features.push_back({name, FeatureType::Numeric});
@@ -152,31 +189,40 @@ Table load_breast(const std::string& path) {
 
     Table table = make_empty_table("Breast Cancer Wisconsin", features, {"benign", "malignant"});
 
-    for (std::size_t row = 1; row < rows.size(); ++row) {
+    for (std::size_t row = 1; row < rows.size(); row++) {
         if (rows[row].size() < 2 + features.size()) {
             continue;
         }
 
+        //Seperate into numeric and categorical features
         std::vector<double> numeric(features.size(), std::numeric_limits<double>::quiet_NaN());
         std::vector<std::string> categorical(features.size());
-        for (std::size_t feature = 0; feature < features.size(); ++feature) {
+
+        for (std::size_t feature = 0; feature < features.size(); feature++) {
             numeric[feature] = parse_double_or_nan(rows[row][feature + 2]);
         }
 
         table.numeric_values.push_back(std::move(numeric));
         table.categorical_values.push_back(std::move(categorical));
+
+        // Convert label: M -> 1, B -> 0
         table.labels.push_back(trim(rows[row][1]) == "M" ? 1 : 0);
     }
 
     return table;
 }
 
+/*
+ * Load Heart Disease dataset.
+ * Mix of numeric and categorical features with fixed mapping.
+ */
 Table load_heart(const std::string& path) {
     const auto rows = read_csv_rows(path);
     if (rows.size() < 2) {
         throw std::runtime_error("Heart-disease dataset is empty: " + path);
     }
 
+    // Define feature schema
     const std::vector<FeatureSpec> features{
         {"age", FeatureType::Numeric},
         {"sex", FeatureType::Categorical},
@@ -196,7 +242,7 @@ Table load_heart(const std::string& path) {
 
     Table table = make_empty_table("Heart Disease", features, {"no_disease", "disease_present"});
 
-    for (std::size_t row = 1; row < rows.size(); ++row) {
+    for (std::size_t row = 1; row < rows.size(); row++) {
         if (rows[row].size() < 16) {
             continue;
         }
@@ -204,6 +250,7 @@ Table load_heart(const std::string& path) {
         std::vector<double> numeric(features.size(), std::numeric_limits<double>::quiet_NaN());
         std::vector<std::string> categorical(features.size());
 
+        // map columns to features
         numeric[0] = parse_double_or_nan(rows[row][1]);
         categorical[1] = trim(rows[row][2]);
         categorical[2] = trim(rows[row][3]);
@@ -219,19 +266,31 @@ Table load_heart(const std::string& path) {
         categorical[12] = trim(rows[row][13]);
         categorical[13] = trim(rows[row][14]);
 
+        //Seperate into numeric and categorical features
         table.numeric_values.push_back(std::move(numeric));
         table.categorical_values.push_back(std::move(categorical));
+
+        // Binary label: any positive value -> disease present
         table.labels.push_back(std::stoi(trim(rows[row][15])) > 0 ? 1 : 0);
     }
 
     return table;
 }
 
+/*
+ * Impute missing values using training-set statistics.
+ * - Numeric: median of observed training values
+ * - Categorical: replace empty with "MISSING"
+ *
+ * Important: avoids data leakage by only using training indices.
+ */
 Table impute_with_training_statistics(const Table& raw, const std::vector<int>& train_indices) {
     Table prepared = raw;
 
     std::vector<double> numeric_medians(raw.features.size(), 0.0);
-    for (std::size_t feature = 0; feature < raw.features.size(); ++feature) {
+
+    // Compute medians using training subset only
+    for (std::size_t feature = 0; feature < raw.features.size(); feature++) {
         if (raw.features[feature].type != FeatureType::Numeric) {
             continue;
         }
@@ -246,8 +305,9 @@ Table impute_with_training_statistics(const Table& raw, const std::vector<int>& 
         numeric_medians[feature] = median(std::move(observed));
     }
 
-    for (std::size_t row = 0; row < prepared.labels.size(); ++row) {
-        for (std::size_t feature = 0; feature < prepared.features.size(); ++feature) {
+    // Apply imputation to all rows
+    for (std::size_t row = 0; row < prepared.labels.size(); row++) {
+        for (std::size_t feature = 0; feature < prepared.features.size(); feature++) {
             if (prepared.features[feature].type == FeatureType::Numeric) {
                 if (std::isnan(prepared.numeric_values[row][feature])) {
                     prepared.numeric_values[row][feature] = numeric_medians[feature];
@@ -261,4 +321,4 @@ Table impute_with_training_statistics(const Table& raw, const std::vector<int>& 
     return prepared;
 }
 
-}  // namespace risk_aware_shift
+}  // namespace risk_aware_shift ends

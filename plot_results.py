@@ -24,6 +24,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
+"""
+Parse command-line arguments.
+Allows overriding input/output directories and beta file.
+"""
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate per-dataset plots from experiment CSV files.")
     parser.add_argument(
@@ -47,12 +51,19 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+"""
+Load a CSV file into a DataFrame.
+Fails early if file is missing.
+"""
 def load_csv(path: Path) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"Missing required file: {path}")
     return pd.read_csv(path)
 
 
+"""
+Convert internal method names to readable labels for plots.
+"""
 def normalize_method_name(method: str) -> str:
     mapping = {
         "gain_ratio": "Gain Ratio",
@@ -62,6 +73,10 @@ def normalize_method_name(method: str) -> str:
     return mapping.get(method, method)
 
 
+"""
+Create filesystem-safe version of dataset name.
+Used for directory naming.
+"""
 def safe_name(name: str) -> str:
     return (
         name.lower()
@@ -71,6 +86,10 @@ def safe_name(name: str) -> str:
     )
 
 
+"""
+Annotate bar charts with numeric values.
+Improves readability for reports.
+"""
 def annotate_bars(ax) -> None:
     for container in ax.containers:
         labels = []
@@ -83,6 +102,11 @@ def annotate_bars(ax) -> None:
         ax.bar_label(container, labels=labels, padding=3, fontsize=8)
 
 
+"""
+Create a bar chart comparing methods for a single dataset.
+
+Each bar is labeled with its numeric value.
+"""
 def save_dataset_bar_chart(dataset_df: pd.DataFrame, metric: str, ylabel: str, output_path: Path) -> None:
     dataset_name = dataset_df["dataset"].iloc[0]
     ordered = dataset_df.sort_values("method_label")
@@ -98,6 +122,13 @@ def save_dataset_bar_chart(dataset_df: pd.DataFrame, metric: str, ylabel: str, o
     plt.close()
 
 
+"""
+Create scatter plot for comparing two metrics.
+
+Used to visualize trade-offs:
+- shift vs risk
+- risk vs accuracy
+"""
 def save_dataset_scatter(dataset_df: pd.DataFrame, x: str, y: str, title: str, output_path: Path) -> None:
     dataset_name = dataset_df["dataset"].iloc[0]
     plt.figure(figsize=(8, 6))
@@ -116,14 +147,20 @@ def save_dataset_scatter(dataset_df: pd.DataFrame, x: str, y: str, title: str, o
     plt.savefig(output_path, dpi=300, bbox_inches="tight")
     plt.close()
 
-
+"""
+Annotate points on line plots (beta sweep).
+"""
 def annotate_line_points(x_values, y_values) -> None:
     for x, y in zip(x_values, y_values):
         if pd.isna(y):
             continue
         plt.annotate(f"{y:.3f}", (x, y), textcoords="offset points", xytext=(0, 6), ha="center", fontsize=8)
 
+"""
+Create line plot showing how metrics change with beta.
 
+Key for analyzing Risk-Aware Shift behavior.
+"""
 def save_dataset_beta_line_plot(dataset_df: pd.DataFrame, metric: str, ylabel: str, output_path: Path) -> None:
     dataset_name = dataset_df["dataset"].iloc[0]
     ordered = dataset_df.sort_values("beta")
@@ -141,6 +178,13 @@ def save_dataset_beta_line_plot(dataset_df: pd.DataFrame, metric: str, ylabel: s
     plt.close()
 
 
+"""
+Main pipeline:
+1. Load all experiment CSV outputs
+2. Merge datasets for comparison
+3. Generate plots per dataset
+4. Save all plots to structured directories
+"""
 def main() -> None:
     args = parse_args()
     input_dir = args.input_dir
