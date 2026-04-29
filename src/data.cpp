@@ -154,7 +154,7 @@ Table load_pima(const std::string& path) {
 
         std::vector<double> numeric(features.size(), std::numeric_limits<double>::quiet_NaN());
         std::vector<std::string> categorical(features.size());
-        for (std::size_t feature = 0; feature < features.size(); feature+) {
+        for (std::size_t feature = 0; feature < features.size(); feature++) {
             numeric[feature] = parse_double_or_nan(rows[row][feature]);
         }
 
