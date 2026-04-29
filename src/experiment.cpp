@@ -270,7 +270,7 @@ ExperimentConfig parse_args(int argc, char** argv) {
             if (index + 1 >= argc) {
                 throw std::runtime_error("Missing value for " + flag);
             }
-            return argv[index++];
+            return argv[++index];
         };
 
         if (arg == "--data-root") {
